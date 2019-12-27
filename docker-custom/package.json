@@ -27,7 +27,11 @@
         }
     ],
     "dependencies": {
-        "node-red": "1.0.3"
+        "node-red": "1.0.3",
+        "node-red-contrib-openzwave-am": "1.5.10",
+        "node-red-contrib-influxdb": "0.4.0",
+        "node-red-contrib-mqtt-broker": "0.2.4",
+        "node-red-contrib-interpolate": "tsaarni/node-red-contrib-interpolate"
     },
     "engines": {
         "node": ">=10"

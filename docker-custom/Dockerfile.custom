@@ -1,12 +1,9 @@
-ARG ARCH=amd64
-ARG NODE_VERSION=10
-ARG OS=alpine
+ARG ARCH=arm32v7
+ARG NODE_VERSION=12
+ARG OS=alpine3.11
 
 #### Stage BASE ########################################################################################################
 FROM ${ARCH}/node:${NODE_VERSION}-${OS} AS base
-
-# Copy scripts
-COPY scripts/*.sh /tmp/
 
 # Install tools, create Node-RED app and data dir, add user and set rights
 RUN set -ex && \
@@ -21,23 +18,27 @@ RUN set -ex && \
     mkdir -p /usr/src/node-red /data && \
     deluser --remove-home node && \
     adduser -h /usr/src/node-red -D -H node-red -u 1000 && \
-    chown -R node-red:node-red /data && \
-    chown -R node-red:node-red /usr/src/node-red
+    addgroup node-red dialout && \
+    chown -R node-red:node-red /data 
 
 # Set work directory
 WORKDIR /usr/src/node-red
-
-# package.json contains Node-RED NPM module and node dependencies
-COPY package.json .
 
 #### Stage BUILD #######################################################################################################
 FROM base AS build
 
 # Install Build tools
-RUN apk add --no-cache --virtual buildtools build-base linux-headers udev python && \
-    npm install --unsafe-perm --no-update-notifier --only=production && \
+RUN apk add --no-cache --virtual buildtools build-base linux-headers udev python openzwave-dev
+
+# package.json contains Node-RED NPM module and node dependencies
+COPY package.json .
+COPY scripts/remove_native_gpio.sh /tmp
+
+RUN npm install --unsafe-perm=true --no-update-notifier --only=production && \
     /tmp/remove_native_gpio.sh && \
-    cp -R node_modules prod_node_modules
+    cp -R node_modules prod_node_modules && \
+    chown -R node-red:node-red /usr/src/node-red && \
+    /tmp/remove_native_gpio.sh
 
 #### Stage RELEASE #####################################################################################################
 FROM base AS RELEASE
@@ -61,12 +62,12 @@ LABEL org.label-schema.build-date=${BUILD_DATE} \
     org.label-schema.arch=${ARCH} \
     authors="Dave Conway-Jones, Nick O'Leary, James Thomas, Raymond Mouthaan"
 
+COPY package.json .
 COPY --from=build /usr/src/node-red/prod_node_modules ./node_modules
 
 # Chown, install devtools & Clean up
-RUN chown -R node-red:node-red /usr/src/node-red && \
-    /tmp/install_devtools.sh && \
-    rm /tmp/*
+RUN apk add --no-cache openzwave && \
+    chown -R node-red:node-red /usr/src/node-red 
 
 USER node-red
 
